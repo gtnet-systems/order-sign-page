@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<title>ご注文内容のご確認とご承認</title>
+
+<!--
+  GTNET 見積・注文 承認システム
+  ── お客様向け「注文書のご確認・ご承認」画面（ステップ2）
+
+    C10_page.html  v1.9 (2026-09-10)
+      ・【PCのとき、注文書を大きく見せる】ようにした。
+        これまでは画面全体が680px（スマホに合わせた幅）で、注文書もその中に
+        収まっていました。PCでは細すぎて、必ず拡大が要る状態でした。
+        → PCのときだけ、注文書のカードだけを最大1300pxまで広げます。
+          他のカード（ご注文の内容・特約条項・重要事項）は680pxのままです。
+          文章は幅が広いほど読みにくくなるためです。
+
+      ・【拡大したとき、横スクロールバーを画面の中に留める】ようにした。
+        拡大枠に高さの上限が無かったため、拡大するほど枠が縦に伸び、
+        横スクロールバーが画面の外（ずっと下）へ逃げていました。
+        横へ動かすたびに画面を上下させる必要があり、部長のご指摘のとおりです。
+        → PCのときだけ枠の高さを 82vh で頭打ちにし、バーを常に見える位置へ。
+
+      ★スマホ・タブレット（横1000px未満）には一切影響しません。
+
+    C10_page.html  v1.8 (2026-09-09)
+    ・特約事項を【文字で】出せるようにした（本体 16_articles.gs ／ C07_terms.gs v1.1 とセット）。
+
+      v1.6・v1.7 で画質と幅を直したが、そもそも画像である限り限界がある。
+      文字にすれば、拡大の問題は根から消える。
+        ・何倍でも鮮明。そもそも拡大が要らない
+        ・スマホでは画面幅で折り返す（横スクロールが消える）
+        ・数十KB。pdf.js の読み込みも、描き直しの待ち時間もない
+        ・紙にしかない手書き欄（保証の有無・必要書類）を出さずに済む
+
+      ★どちらを出すかは settings『特約事項の表示方法』の1セルで決まります。
+        画面側はその値を受け取って分岐するだけです。
+        ★PDFの処理は消していません。1セル書き換えれば、いつでも戻せます。
+
+    ★本文の改行と字下げは white-space:pre-wrap でそのまま出しています。
+      ここを normal にすると、①②③の並びとア．イ．の字下げが全部つぶれます。
+
+    ★読む画面をPCで広げる（.pdfmode）のは、PDFのときだけです。
+      文字を1400pxまで広げると1行が長くなりすぎて、かえって読みにくくなります。
+      「広いほうが読みやすい」は、画像か文字かで逆になります。
+
+    C10_page.html  v1.7 (2026-09-09)
+    ・【特約条項を読む画面を、PCでは幅いっぱいまで使う】ようにした。
+
+      v1.6 で拡大の画質は直したが、PCではほとんど変わって見えなかった（部長・実機）。
+      原因は画質ではなく【幅】だった。読む画面の中身を 680px で打ち止めにしていたため、
+      1920px のモニターがあっても、A4の2段組みの条文を 680px の細い柱に押し込み、
+      それを300%に拡大して横スクロールで読む——という、いちばん苦しい形にしていた。
+      ★幅を 1400px まで広げると、PCでは拡大しなくても読める。
+
+      ★重要事項のご説明（#shItems）は 680px のままにしている。
+        あちらは普通の文章で、1行が長すぎるとかえって読みにくくなるため。
+        「広いほうが読みやすい」は、書面の種類によって逆になる。
+
+    ・canvasの画素数の上限を、端末によって変えるようにした（PCは2,000万画素まで）。
+      ★判定は必ず「iOSかどうか」を先に見ること。画面の広さで判定すると、
+        iPad（画面は広いがiOSの制限がある）で真っ白なcanvasになる。
+
+    C10_page.html  v1.6 (2026-09-09)
+    ・【拡大したときに、その倍率で描き直す】ようにした。
+      それまでは1回だけ描いた画像を、＋ボタンで引き伸ばしていただけだった。
+
+      裏面の条文が300%にしてもぼやける、という指摘（部長・実機）で分かった。
+      スマホで描いていたのは横 約1,420px。裏面のスキャンは 4,960px（600dpi）あり、
+      ★元データの3.5分の1しか使っていなかった。
+      表面の注文書は大きな数字を読めれば足りたので、誰も気づかなかった。
+      裏面は2段組みの細かい条文で、しかも読ませたいのは違約金の条項なので、
+      ここがぼやけると機能そのものが意味を失う。
+
+      → ＋−を押すたびに、その倍率に必要な画素数で描き直す。
+        300%で 約2,900px（従来の約2倍）。100%のときは逆に画素を減らすので、
+        電波の弱い端末のメモリはむしろ軽くなる。
+
+    ★1枚のcanvasは1,200万画素で頭を押さえている（MAX_CANVAS_PX）。
+      iPhone は 約1,670万画素を超えると【エラーを出さずに真っ白なcanvasを返す】。
+      「表示できませんでした」ではなく「白い紙」が出るので、誰も原因に気づけない。
+      この上限を上げるときは、必ず実機のiPhoneで確かめること。
+
+    C10_page.html  v1.5 (2026-09-09)
+    ・【注文書裏面（特約条項）】を見るボタンを足した。★全お客様・例外なし。
+      読み終えて「確認しました」を押すまで、ご承認ボタンは押せない。
+
+      紙の注文書には裏面に特約条項があり、キャンセルしたときの違約金も
+      そこに書かれている。電子注文書ではこれが一度もお客様の目に
+      触れていなかった（2026-09-09 現場より）。
+      約款を説明せずに契約だけ取ることはできないので、順番で担保する。
+
+    ・【重要事項のご説明】を見るボタンを足した。★選ばれた案件だけ。
+      営業が注文書の申請時に「このお客様には1番と5番」と選んだときだけ、
+      その項目が出る。選ばれていなければ★カードごと出ない。
+
+      ★8割の営業マンは使わない、静かな機能です（部長）。
+        選択が0件のお客様の画面は、v1.4 と1ミリも変わりません。
+        ここに「重要事項は選択されていません」などと出さないこと。
+
+    ・どちらも【本文の一番下】に「確認しました」を置いている。
+      上に置くと、開いた瞬間に押せてしまい、読む理由がなくなる。
+      スクロールしないと届かない位置に置くことが、この機能の作りの要です。
+      ★将来ここを「閉じる」ボタンと兼用にしないこと。
+
+    ・PDFの描き直しを renderPdfInto に切り出した（注文書と裏面で共用）。
+      ★cMapUrl / cMapPacked / standardFontDataUrl の3つは v1.2 の急所です。
+        共用にしたことで、外すと注文書と裏面の両方が壊れます。絶対に外さないこと。
+
+  C10_page.html  v1.4 (2026-08-25)
+    ・ご回答済みのお客様には、完了画面の導線を「マイページのご案内」に差し替えた
+      （res.surveyAnswered で分岐。C05_survey.gs v1.1／C04_copymail.gs v1.3 とセット）
+
+  v1.3 の変更 ── 控えメール（第2回）に合わせた画面側の手当て
+    ・ご承認ボタンを押したあと、控えメールの作成と送信で数秒かかるようになった。
+      「送信しています…」だけだと、お客様は固まったと思って戻るボタンを押す。
+      何が起きているかを書き、待つ時間があることを先に伝える。
+    ・完了画面で、控えメールを送れたかどうかを分けて表示する。
+      送れていないのに「お送りしました」と書かないこと。
+
+  C10_page.html  v1.2 (2026-08-23)
+
+  v1.2 の変更 ── 注文書の金額・年式などが空白になっていた件の修正
+    ・PDFの読み込み時に【CMap（文字コードの変換表）】と【代用フォント】の
+      置き場所を教えるようにした。
+
+      基幹（エクストリームWEB）が作る注文書PDFは、印字した値の文字に
+      日本語フォントを埋め込まず、「MS明朝で書くこと」という指示だけを持っている。
+      　　値の文字：MS-Gothic / MS-Mincho（エンコーディング 90msp-RKSJ-H）＝埋め込み無し
+      　　様式の文字：MS-PGothic ほか＝埋め込み有り
+      Acrobat や Chrome の標準ビューアは、パソコンにあるMS明朝で代用して表示するが、
+      pdf.js は日本語フォントも変換表も持っていないため、値の文字だけ何も描けない。
+      罫線と項目名は出るのに、金額と年式だけが空白に見える、という症状になる。
+
+      → cMapUrl / cMapPacked / standardFontDataUrl を渡して解決。
+      → あわせて pdf.js の取得先を jsDelivr に統一した（変換表が同じ場所にあるため）。
+
+    ★このPDFの作りは基幹側の仕様であり、当社では変えられない（基幹の改修は不可）。
+      注文書PDFの見せ方を将来変更する場合も、この3つの指定を外さないこと。
+      外すと、症状は「金額だけが静かに消える」という形でしか出ない。
+
+  C10_page.html  v1.1 (2026-08-23)
+
+  v1.1 の変更
+    ・注文書に【拡大・縮小ボタン】を付けた
+        スマホはピンチ操作でOSが拡大してくれるが、PCにはその手段がない。
+        画像として描いている以上、ブラウザの「ページの拡大」しか残らず、
+        お客様が金額を読めない場面が出る。横スクロールできる枠に入れ、
+        ＋−で 100/150/200/300% に切り替える。
+        あわせて描画の解像度を上げた（拡大してもぼやけないように）。
+    ・PDFの【入力欄（フォーム）の中身】も描くようにした
+        pdf.js は既定でフォームの枠だけを描き、入力された値を描かない。
+        罫線は出るのに金額や年式だけが空白に見える、という症状になる。
+        annotationMode を ENABLE_FORMS にして、値まで描かせる。
+
+  C10_page.html  v1.0 (2026-08-23)
+
+  【配色について】
+    保険システムのお客様マイページ（index.html）の :root をそのまま引き継いでいます。
+    赤＝お客様に行動していただくところ／白＝読んでいただくところ。角丸16px。
+    社内画面（ネイビー）とは別物です。混ぜないでください。
+
+  【注文書PDFの表示について】
+    サーバーから中身（Base64）を受け取り、pdf.js で画像として描き直しています。
+    iPhone の Safari は PDF の埋め込み表示をブロックするため、
+    <embed> や <iframe> では現場のお客様の多くが「真っ白」を見ることになります。
+    Drive の URL は画面に一切出しません（期限のない裏口を作らないため）。
+-->
+
+<style>
+:root{
+  --red:#C62828;
+  --red-d:#A51D1D;
+  --ink:#222;
+  --ink-sub:#666;
+  --line:#e5e5e5;
+  --bg:#f5f5f5;
+  --white:#fff;
+  --radius:16px;
+  --ok:#2E7D32;
+}
+*{box-sizing:border-box;-webkit-text-size-adjust:100%;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;
+  font-size:16px;
+  line-height:1.7;
+  padding-bottom:40px;
+}
+.wrap{max-width:680px;margin:0 auto;padding:0 14px;}
+
+/* ヘッダー */
+.head{
+  background:var(--white);
+  border-bottom:3px solid var(--red);
+  padding:14px 0;
+  margin-bottom:16px;
+}
+.head .wrap{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.head .co{font-weight:700;font-size:15px;letter-spacing:.04em;}
+.head .no{font-size:12px;color:var(--ink-sub);}
+
+/* カード */
+.card{
+  background:var(--white);
+  border-radius:var(--radius);
+  padding:18px 16px;
+  margin-bottom:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.card h2{
+  margin:0 0 12px;
+  font-size:16px;
+  font-weight:700;
+  padding-left:10px;
+  border-left:4px solid var(--red);
+  line-height:1.4;
+}
+.lead{font-size:20px;font-weight:700;margin:0 0 6px;line-height:1.5;}
+.lead .sama{font-size:15px;font-weight:400;margin-left:2px;}
+.sub{color:var(--ink-sub);font-size:14px;margin:0;}
+
+/* 明細 */
+dl.spec{margin:0;}
+dl.spec > div{
+  display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);
+}
+dl.spec > div:last-child{border-bottom:none;}
+dl.spec dt{
+  flex:0 0 6.5em;color:var(--ink-sub);font-size:14px;margin:0;
+}
+dl.spec dd{flex:1;margin:0;font-size:15px;word-break:break-word;}
+.total{font-size:20px;font-weight:700;}
+.total .yen{font-size:14px;font-weight:400;margin-left:2px;}
+
+/* 保証（いちばん大事なところ） */
+.warranty-box{
+  background:#FFF8F8;
+  border:1px solid #F0D6D6;
+  border-radius:12px;
+  padding:14px;
+  margin:4px 0 12px;
+}
+.warranty-box .val{font-size:16px;font-weight:700;line-height:1.6;word-break:break-word;}
+.warranty-box .memo{
+  margin-top:8px;padding-top:8px;border-top:1px dashed #E3C4C4;
+  font-size:14px;word-break:break-word;
+}
+.warranty-box .none{font-weight:700;color:var(--ink);}
+
+/* チェック */
+label.check{
+  display:flex;gap:11px;align-items:flex-start;
+  background:var(--white);
+  border:2px solid var(--line);
+  border-radius:12px;
+  padding:13px 14px;
+  margin-bottom:10px;
+  cursor:pointer;
+  transition:border-color .15s, background .15s;
+}
+label.check.on{border-color:var(--red);background:#FFF8F8;}
+label.check input{
+  flex:0 0 auto;width:22px;height:22px;margin:1px 0 0;accent-color:var(--red);
+}
+label.check span{font-size:15px;line-height:1.6;}
+
+/* 入力 */
+.field{margin-bottom:6px;}
+.field label.ttl{display:block;font-size:14px;font-weight:700;margin-bottom:6px;}
+.field .must{
+  color:var(--red);font-size:12px;font-weight:700;margin-left:6px;
+  border:1px solid var(--red);border-radius:4px;padding:0 5px;vertical-align:2px;
+}
+.field input[type=text]{
+  width:100%;font-size:17px;padding:12px;
+  border:2px solid var(--line);border-radius:12px;background:#fff;
+  font-family:inherit;
+}
+.field input[type=text]:focus{outline:none;border-color:var(--red);}
+.field .hint{font-size:13px;color:var(--ink-sub);margin-top:6px;}
+
+/* PDF */
+#pdfArea{margin-top:4px;}
+.pdf-page{
+  width:100%;height:auto;display:block;
+  border:1px solid var(--line);border-radius:8px;margin-bottom:10px;background:#fff;
+}
+/* 拡大したときに横へスクロールできる枠 */
+.pdf-scroll{
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  border-radius:8px;
+}
+/* 拡大・縮小のボタン */
+.pdf-tools{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:10px;
+}
+.pdf-tools button{
+  font-family:inherit;font-size:15px;font-weight:700;
+  min-width:44px;height:40px;padding:0 12px;
+  color:var(--red);background:#fff;
+  border:2px solid var(--line);border-radius:10px;cursor:pointer;
+}
+.pdf-tools button:active{background:#FFF3F3;}
+.pdf-tools button:disabled{color:#bbb;border-color:#eee;cursor:default;}
+.pdf-tools .z{
+  font-size:13px;color:var(--ink-sub);min-width:4.2em;text-align:center;
+}
+.pdf-tools .tip{font-size:12px;color:var(--ink-sub);margin-left:auto;text-align:right;line-height:1.4;}
+.pdf-state{
+  padding:26px 14px;text-align:center;color:var(--ink-sub);font-size:14px;
+  background:#FAFAFA;border:1px dashed var(--line);border-radius:12px;
+  white-space:pre-wrap;
+}
+.spinner{
+  display:inline-block;width:20px;height:20px;vertical-align:-4px;margin-right:8px;
+  border:3px solid #ddd;border-top-color:var(--red);border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ボタン */
+.btn{
+  display:block;width:100%;
+  padding:17px 16px;
+  font-size:17px;font-weight:700;
+  font-family:inherit;
+  color:#fff;background:var(--red);
+  border:none;border-radius:var(--radius);
+  cursor:pointer;text-align:center;text-decoration:none;
+  box-shadow:0 2px 0 var(--red-d);
+}
+.btn:active{transform:translateY(1px);box-shadow:0 1px 0 var(--red-d);}
+.btn:disabled{background:#c9c9c9;box-shadow:0 2px 0 #b0b0b0;cursor:default;}
+.btn-line{margin-top:4px;}
+
+/* ===================================================================
+   v1.5：書面を読むためのボタンと、読んだかどうかの表示
+   =================================================================== */
+.readbtn{
+  display:block;width:100%;
+  padding:15px 16px;
+  font-size:16px;font-weight:700;font-family:inherit;
+  color:var(--red);background:#fff;
+  border:2px solid var(--red);border-radius:12px;
+  cursor:pointer;text-align:center;
+}
+.readbtn:active{background:#FFF3F3;}
+.readbtn.done{color:var(--ok);border-color:#BBD9BC;background:#F4FAF4;}
+.readnote{font-size:13.5px;color:var(--ink-sub);line-height:1.7;margin:0 0 11px;}
+.readnote b{color:var(--ink);}
+.readstate{
+  margin-top:9px;font-size:13.5px;font-weight:700;text-align:center;line-height:1.6;
+}
+.readstate.yet{color:var(--red);}
+.readstate.ok{color:var(--ok);}
+
+/* 選ばれた重要事項の見出し一覧（カードに小さく出す） */
+.itemlist{
+  margin:0 0 12px;padding:11px 13px;
+  background:#FAFAFA;border:1px solid var(--line);border-radius:12px;
+  font-size:14px;line-height:1.9;
+}
+.itemlist .n{
+  display:inline-block;min-width:1.9em;margin-right:6px;padding:0 5px;
+  background:var(--red);color:#fff;border-radius:5px;
+  font-size:12.5px;font-weight:700;text-align:center;vertical-align:1px;
+}
+
+/* ご承認ボタンの手前に出す「あと何が残っているか」 */
+.gate{
+  margin:0 0 10px;padding:11px 13px;
+  background:#FFF8F8;border:1px solid #F0D6D6;border-radius:12px;
+  font-size:13.5px;line-height:1.8;color:#8a3030;white-space:pre-wrap;
+}
+
+/* ===================================================================
+   v1.5：書面を読む画面（全面に出す）
+   ★「確認しました」は本文のいちばん下にあります。
+     上へ動かさないでください。開いた瞬間に押せてしまいます。
+   =================================================================== */
+.sheet{
+  position:fixed;inset:0;z-index:200;
+  background:var(--bg);
+  display:none;flex-direction:column;
+}
+.sheet.on{display:flex;}
+.sheet-hd{
+  flex:0 0 auto;background:var(--white);border-bottom:3px solid var(--red);
+  padding:12px 14px;display:flex;align-items:center;gap:10px;
+}
+.sheet-hd .t{font-size:15.5px;font-weight:700;line-height:1.4;flex:1;}
+.sheet-hd .x{
+  flex:0 0 auto;width:40px;height:40px;
+  font-family:inherit;font-size:20px;line-height:1;
+  color:var(--ink-sub);background:#fff;
+  border:2px solid var(--line);border-radius:10px;cursor:pointer;
+}
+.sheet-body{
+  flex:1 1 auto;overflow:auto;-webkit-overflow-scrolling:touch;
+  padding:14px 14px 0;
+}
+.sheet-body .inner{max-width:680px;margin:0 auto;}
+
+/* 【v1.7／v1.8】特約条項をPDFで見せているときだけ、PCで幅いっぱいまで使う。
+   ★A4の2段組みの画像を680pxの柱に押し込むと、PCでも拡大しないと読めません。
+   ★【v1.8】文字で見せるときは広げません。1行が長すぎると読みにくくなるためです。
+     「広いほうが読みやすい」は、画像か文字かで逆になります。
+   ★重要事項のご説明（#shItems）も文章なので680pxのままです。 */
+#shTerms.pdfmode .sheet-body .inner{max-width:1400px;}
+#shTerms.pdfmode .sheet-lead{max-width:680px;}
+#shTerms.pdfmode .sheet-ft{max-width:680px;}
+
+/* 【v1.9】PCのときだけ、注文書を大きく見せる。
+   ここで広げるのは #cardOrderPdf（注文書のカード）だけです。
+   ★本文（.wrap）の680pxは触りません。文章は幅が広いほど読みにくくなるためです。 */
+@media (min-width:1000px){
+  /* 680pxの本文からはみ出して、画面の中央に広く置く */
+  #cardOrderPdf{
+    width:min(1300px, calc(100vw - 48px));
+    margin-left:50%;
+    transform:translateX(-50%);
+  }
+  /* 【v1.9】拡大したときの横スクロールバーを、画面の中に留める。
+     高さの上限が無いと、拡大するほど枠が縦に伸び、バーが画面の外へ逃げます。 */
+  #cardOrderPdf .pdf-scroll{
+    max-height:82vh;
+  }
+}
+
+/* ===================================================================
+   【v1.8】特約事項を文字で見せるとき
+   ★お客様が読む契約条文です。行間を詰めないこと。
+   =================================================================== */
+.art-box{
+  background:#fff;border:2px solid var(--ink);border-radius:10px;
+  padding:14px 15px;margin-bottom:16px;
+}
+.art-box .t{font-size:15px;font-weight:700;margin-bottom:6px;}
+.art-box .b{font-size:14.5px;line-height:1.9;}
+.art-sec{
+  font-size:16px;font-weight:700;margin:26px 0 12px;
+  padding-left:10px;border-left:4px solid var(--red);line-height:1.5;
+}
+.art{
+  background:#fff;border-radius:12px;padding:15px 16px;margin-bottom:11px;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);
+}
+.art .h{font-size:15.5px;font-weight:700;line-height:1.5;margin-bottom:8px;}
+/* ★本文の改行と字下げは、シートに入っているとおりに出します（pre-wrap）。
+   ここを normal にすると、①②③の並びとア．イ．の字下げが全部つぶれます。 */
+.art .b{font-size:14.5px;line-height:1.95;white-space:pre-wrap;word-break:break-word;}
+.art-pledge{
+  background:#FFF8F8;border:1px solid #F0D6D6;border-radius:12px;
+  padding:15px 16px;margin:16px 0 11px;
+  font-size:14.5px;line-height:2;white-space:pre-wrap;word-break:break-word;font-weight:700;
+}
+.art-ver{text-align:right;font-size:12.5px;color:var(--ink-sub);margin:4px 0 0;}
+.sheet-lead{
+  background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;
+  font-size:14px;line-height:1.8;color:#444;
+}
+.sheet-lead b{color:var(--ink);}
+.sheet-ft{
+  max-width:680px;margin:0 auto;padding:16px 0 30px;
+}
+.sheet-ft .say{
+  text-align:center;font-size:13.5px;color:var(--ink-sub);
+  margin:0 0 10px;line-height:1.7;
+}
+
+/* 重要事項の1項目 */
+.item{
+  background:#fff;border-radius:12px;padding:14px 15px;margin-bottom:11px;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);
+}
+.item .h{
+  display:flex;gap:9px;align-items:baseline;
+  font-size:15.5px;font-weight:700;line-height:1.5;margin-bottom:7px;
+}
+.item .h .n{
+  flex:0 0 auto;min-width:2em;padding:1px 6px;
+  background:var(--red);color:#fff;border-radius:6px;
+  font-size:13px;text-align:center;
+}
+.item .b{font-size:14.5px;line-height:1.9;white-space:pre-wrap;word-break:break-word;}
+
+/* 期限・注意 */
+.limit{
+  text-align:center;font-size:13px;color:var(--ink-sub);margin:14px 0 0;
+}
+.err{
+  background:#FFF0F0;border:1px solid #F3C9C9;color:#A51D1D;
+  border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14.5px;
+  white-space:pre-wrap;
+}
+.foot{
+  text-align:center;font-size:11px;color:#aaa;margin-top:22px;
+}
+
+/* 完了・案内画面 */
+.center{text-align:center;}
+.mark{font-size:46px;line-height:1;margin-bottom:6px;}
+.msg{white-space:pre-wrap;font-size:15px;line-height:1.8;}
+.contact{
+  margin-top:16px;padding-top:14px;border-top:1px solid var(--line);
+  font-size:14px;color:var(--ink-sub);
+}
+.next{
+  background:#FFF8F8;border:1px solid #F0D6D6;border-radius:12px;
+  padding:16px 14px;margin-top:18px;text-align:left;
+}
+.next .t{font-weight:700;font-size:15px;margin-bottom:6px;}
+.next .d{font-size:14px;color:#555;margin-bottom:12px;line-height:1.7;}
+
+/* 送信中の覆い */
+#overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);
+  display:none;align-items:center;justify-content:center;z-index:300;padding:20px;
+}
+#overlay.on{display:flex;}
+#overlay .box{
+  background:#fff;border-radius:var(--radius);padding:26px 22px;
+  text-align:center;max-width:320px;width:100%;
+}
+#overlay .box p{margin:12px 0 0;font-size:15px;font-weight:700;white-space:pre-wrap;line-height:1.7;}
+.hide{display:none !important;}
+</style>
+</head>
+
+<body>
+
+<div class="head">
+  <div class="wrap">
+    <div class="co" id="hCompany"></div>
+    <div class="no" id="hNo"></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ 読み込み中（静的ホスティング版だけにあります）============
+       旧方式はサーバーがMODELを埋めてHTMLを返すため、この状態がありませんでした。
+       静的ページは、開いてからMODELを取りに行くので、その間だけこれを出します。 -->
+  <div id="screenLoading" class="card" style="text-align:center;padding:44px 16px;">
+    <span class="spinner"></span> 読み込んでいます…
+  </div>
+
+  <!-- ============ ご確認画面 ============ -->
+  <div id="screenForm" class="hide">
+
+    <div class="card">
+      <p class="lead"><span id="fName"></span><span class="sama"> 様</span></p>
+      <p class="sub" id="fLead">ご注文の内容をご確認のうえ、ページの最後にあるボタンでご承認をお願いいたします。</p>
+    </div>
+
+    <div class="card">
+      <h2>ご注文の内容</h2>
+      <dl class="spec">
+        <div><dt>お支払い総額</dt><dd class="total"><span id="fTotal"></span><span class="yen">円（税込）</span></dd></div>
+        <div id="fHolderRow"><dt>お車の名義</dt><dd id="fHolder"></dd></div>
+        <div><dt>担当店舗</dt><dd id="fStore"></dd></div>
+        <div><dt>担当者</dt><dd id="fStaff"></dd></div>
+      </dl>
+    </div>
+
+    <div class="card" id="cardOrderPdf">
+      <h2>注文書</h2>
+      <div id="pdfArea">
+        <div class="pdf-state" id="pdfState"><span class="spinner"></span>注文書を読み込んでいます…</div>
+      </div>
+    </div>
+
+    <!-- ============ v1.5：注文書裏面（特約条項）============
+         ★全お客様に必ず出します。選択で消えることはありません。 -->
+    <div class="card">
+      <h2>注文書の特約事項（裏面）</h2>
+      <p class="readnote">
+        紙の注文書の裏面に印刷されている<b>特約条項</b>です。<br>
+        ご契約後に解約された場合の<b>お取扱い</b>についても記載しております。
+        <b>ご承認の前に、必ずお読みください。</b>
+      </p>
+      <button type="button" class="readbtn" id="btnTerms">📄 特約条項（注文書の裏面）を読む</button>
+      <div class="readstate yet" id="stTerms">まだお読みいただいていません</div>
+      <div class="err hide" id="termsErr"></div>
+    </div>
+
+    <div class="card">
+      <h2>保証について（大切なご確認事項）</h2>
+      <div class="warranty-box">
+        <div class="val" id="fWarranty"></div>
+        <div class="memo hide" id="fWarrantyMemoBox">
+          <span id="fWarrantyMemo"></span>
+        </div>
+      </div>
+      <dl class="spec">
+        <div><dt>法定点検整備</dt><dd id="fInspection"></dd></div>
+      </dl>
+      <label class="check" id="ckWarrantyLabel" style="margin-top:12px;">
+        <input type="checkbox" id="ckWarranty">
+        <span>上記の保証の内容を確認しました</span>
+      </label>
+    </div>
+
+    <!-- ============ v1.5：重要事項のご説明 ============
+         ★担当者が項目を選んだ案件だけに出ます。
+           選ばれていない案件では、このカードごと表示されません。 -->
+    <div class="card hide" id="cardItems">
+      <h2>重要事項のご説明</h2>
+      <p class="readnote">
+        担当者より、<b>次の項目についてご説明</b>いたします。
+        ご承認の前に、内容をお読みください。
+      </p>
+      <div class="itemlist" id="itemList"></div>
+      <button type="button" class="readbtn" id="btnItems">📄 重要事項のご説明を読む</button>
+      <div class="readstate yet" id="stItems">まだお読みいただいていません</div>
+      <div class="err hide" id="itemsErr"></div>
+    </div>
+
+    <div class="card">
+      <h2>お名前の読み方</h2>
+      <div class="field">
+        <label class="ttl" for="inKana">フリガナ<span class="must">必須</span></label>
+        <input type="text" id="inKana" inputmode="kana" autocomplete="off"
+               placeholder="例）ヤマダ タロウ">
+        <p class="hint">ひらがな・カタカナのどちらでも結構です。<br>
+          お名前を正しくお呼びするために使わせていただきます。</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>ご承認</h2>
+      <label class="check" id="ckContractLabel">
+        <input type="checkbox" id="ckContract">
+        <span>注文書および特約条項の内容を確認し、この内容で注文することに同意します</span>
+      </label>
+      <div class="err hide" id="formErr"></div>
+      <div class="gate hide" id="gateHint"></div>
+      <button type="button" class="btn btn-line" id="btnSubmit" disabled>この内容で承認する</button>
+      <p class="limit" id="fLimit"></p>
+    </div>
+
+  </div>
+
+  <!-- ============ 完了・ご案内画面 ============ -->
+  <div id="screenDone" class="hide">
+    <div class="card center">
+      <div class="mark" id="dMark">✅</div>
+      <p class="lead" id="dTitle" style="font-size:19px;"></p>
+      <p class="msg" id="dMsg"></p>
+
+      <div class="next hide" id="dSurvey">
+        <div class="t" id="dSurveyTtl"></div>
+        <div class="d" id="dSurveyDesc"></div>
+        <a class="btn" id="dSurveyBtn" href="#" target="_blank" rel="noopener"></a>
+      </div>
+
+      <div class="contact hide" id="dContact">
+        ご不明な点は、担当までお気軽にお問い合わせください。
+      </div>
+    </div>
+  </div>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<!-- ============ v1.5：特約条項（注文書の裏面）を読む画面 ============ -->
+<div class="sheet" id="shTerms">
+  <div class="sheet-hd">
+    <div class="t">注文書の特約事項（裏面）</div>
+    <button type="button" class="x" id="shTermsX" aria-label="閉じる">×</button>
+  </div>
+  <div class="sheet-body">
+    <div class="inner">
+      <div class="sheet-lead">
+        紙の注文書の裏面に印刷されている特約条項です。<br>
+        <b>お読みいただいたら、いちばん下の「確認しました」を押してください。</b>
+      </div>
+      <div id="termsArea">
+        <div class="pdf-state" id="termsState"><span class="spinner"></span>読み込んでいます…</div>
+      </div>
+      <div class="sheet-ft">
+        <p class="say">最後までご確認いただき、ありがとうございました。</p>
+        <button type="button" class="btn" id="btnTermsOk">確認しました</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ v1.5：重要事項のご説明を読む画面 ============ -->
+<div class="sheet" id="shItems">
+  <div class="sheet-hd">
+    <div class="t">重要事項のご説明</div>
+    <button type="button" class="x" id="shItemsX" aria-label="閉じる">×</button>
+  </div>
+  <div class="sheet-body">
+    <div class="inner">
+      <div class="sheet-lead">
+        担当者よりご説明する項目です。<br>
+        <b>お読みいただいたら、いちばん下の「確認しました」を押してください。</b>
+      </div>
+      <div id="itemsArea"></div>
+      <div class="sheet-ft">
+        <p class="say">最後までご確認いただき、ありがとうございました。</p>
+        <button type="button" class="btn" id="btnItemsOk">確認しました</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="box">
+    <div class="spinner" style="width:30px;height:30px;border-width:4px;"></div>
+    <p id="ovText">送信しています…</p>
+    <p style="font-size:12.5px;font-weight:400;color:#666;margin-top:8px;">この画面を閉じずにお待ちください</p>
+  </div>
+</div>
+
+<script>
+/* ====================================================================
+   静的ホスティング版（Android の /u/2 対策）
+   ★ここだけ、お客様向けWebAppの /exec URL に書き換えてください。
+   ==================================================================== */
+var GAS_API = '__GAS_EXEC_URL__';
+
+/* URLの ?t=（トークン） */
+var TOKEN = (function () {
+  var q = new URLSearchParams(location.search);
+  return q.get('t') || q.get('token') || '';
+})();
+
+/* MODEL は、開いたあとサーバーから受け取ります（旧方式は埋め込みでした） */
+var MODEL = null;
+
+/* ====================================================================
+   通信の作法　★変更しないでください
+   （GTNET自動車保険システム 2026-09-10 の回答書 §6-2 のまま）
+
+   ・別ドメインからの fetch は Cookie を送らない
+     ＝ Google が匿名として扱う ＝ URLに /u/N/ が付かない。
+     これが Android 問題の回避そのものです。
+   ・credentials は既定のまま。'include' を付けると Cookie が送られ、
+     /u/N/ 問題が復活します。
+   ・POST の Content-Type は text/plain。application/json にすると
+     ブラウザがプリフライト（OPTIONS）を飛ばしますが、GASウェブアプリは
+     OPTIONS に応答できないため、必ず失敗します。
+     中身が JSON でも、名乗りは text/plain ── これが定石です。
+   ==================================================================== */
+function apiGet(params) {
+  var qs = Object.keys(params).map(function (k) {
+    return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+  }).join('&');
+  return fetch(GAS_API + '?' + qs, { method: 'GET' }).then(function (r) { return r.json(); });
+}
+function apiPost(payload) {
+  return fetch(GAS_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  }).then(function (r) { return r.json(); });
+}
+
+/* ====================================================================
+   google.script.run の受け皿
+
+   【なぜ、わざと同じ形を残すのか】
+   この下の画面のコードは C10_page.html とまったく同じです。
+   通信の呼び方まで同じにしておけば、画面を直したときに
+   「片方だけ直してしまう」事故が起きません。差分は、このファイルの
+   頭とお尻だけに閉じ込めてあります。
+
+   ★旧方式（C10_page.html）を撤去したら、この受け皿は残したままで構いません。
+     消すと画面のコードを全部書き換えることになります。
+   ==================================================================== */
+var google = {
+  script: {
+    run: (function () {
+      function make(onOk, onNg) {
+        var api = {
+          withSuccessHandler: function (fn) { return make(fn, onNg); },
+          withFailureHandler: function (fn) { return make(onOk, fn); }
+        };
+        function bind(name, call) {
+          api[name] = function () {
+            var args = Array.prototype.slice.call(arguments);
+            call(args)
+              .then(function (res) { if (onOk) { onOk(res); } })
+              ['catch'](function (e) { console.error(e); if (onNg) { onNg(e); } });
+          };
+        }
+        bind('getOrderPdf',   function (a) { return apiGet({ api: 'orderPdf', t: a[0] }); });
+        bind('getTermsPdf',   function (a) { return apiGet({ api: 'termsPdf', t: a[0] }); });
+        bind('markTermsRead', function (a) { return apiPost({ action: 'markRead', token: a[0], kind: a[1] }); });
+        bind('submitSign',    function (a) { return apiPost({ action: 'sign',     token: a[0], payload: a[1] }); });
+        return api;
+      }
+      return make(null, null);
+    })()
+  }
+};
+</script>
+
+<!-- 注文書PDFを画像として描き直すためのライブラリ -->
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+
+<script>
+/* ★旧方式はここが即実行でした。静的版は MODEL を受け取ってから呼びます。
+   中身は C10_page.html と1行も違いません。 */
+function bootPage() {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var setText = function (id, v) { var el = $(id); if (el) el.textContent = (v === undefined || v === null) ? '' : String(v); };
+  var show = function (id) { var el = $(id); if (el) el.classList.remove('hide'); };
+  var hide = function (id) { var el = $(id); if (el) el.classList.add('hide'); };
+
+  // ------------------------------------------------------------------
+  // 共通のヘッダー・フッター
+  // ------------------------------------------------------------------
+  setText('hCompany', MODEL.company || 'GTNET株式会社');
+  setText('hNo', MODEL.mgmtNo ? ('管理番号 ' + MODEL.mgmtNo) : '');
+  setText('foot', (MODEL.company || '') + '　' + (MODEL.version || ''));
+
+  // ------------------------------------------------------------------
+  // エラー・ご案内画面
+  // ------------------------------------------------------------------
+  if (MODEL.mode === 'error' || MODEL.mode === 'done_already') {
+    setText('dMark', MODEL.mode === 'done_already' ? '✅' : '🔒');
+    setText('dTitle', MODEL.title || '');
+    setText('dMsg', MODEL.message || '');
+    if (MODEL.showContact) { show('dContact'); }
+    show('screenDone');
+    return;
+  }
+
+  // ------------------------------------------------------------------
+  // ご確認画面
+  // ------------------------------------------------------------------
+  setText('fName', MODEL.customerName || 'お客様');
+  setText('fTotal', MODEL.totalAmount || '—');
+  setText('fStore', MODEL.store ? (MODEL.store + '店') : '—');
+  setText('fStaff', MODEL.staffName || '—');
+  if (MODEL.holderName) { setText('fHolder', MODEL.holderName); } else { hide('fHolderRow'); }
+
+  if (MODEL.isFinal) {
+    setText('fLead', 'ご納車にあたり、最終のご注文内容をご確認のうえ、ページの最後にあるボタンでご承認をお願いいたします。');
+  }
+
+  // 保証（お客様マイページに出るものと同じ文字列をそのまま表示する）
+  var w = MODEL.warranty || '';
+  if (w === '') {
+    setText('fWarranty', '（保証の記載がありません。担当までお問い合わせください）');
+  } else if (w === 'その他') {
+    setText('fWarranty', '保証付き');
+  } else {
+    setText('fWarranty', w);
+  }
+  if (MODEL.warrantyNote) {
+    setText('fWarrantyMemo', MODEL.warrantyNote);
+    show('fWarrantyMemoBox');
+  }
+  setText('fInspection', MODEL.inspection || '—');
+
+  if (MODEL.kana) { $('inKana').value = MODEL.kana; }
+  setText('fLimit', MODEL.expiresAt ? ('このページは ' + MODEL.expiresAt + ' まで開けます') : '');
+
+  show('screenForm');
+
+  // ==================================================================
+  // v1.5：特約条項（裏面）と重要事項のご説明
+  //
+  //  【この2つの違い】
+  //    特約条項　… 全お客様。必ず出る。読まないと承認できない
+  //    重要事項　… 担当者が選んだ案件だけ。0件ならカードごと出ない
+  //
+  //  ★TERMS.items が空のとき、画面に何も足さないこと。
+  //    「選択されていません」などと書くと、8割のお客様の画面に
+  //    意味のない1行が増えます。
+  // ==================================================================
+
+  var TERMS = MODEL.terms ||
+    { mode: 'pdf', ready: false, pdfReady: false, articles: [], alreadyRead: false, items: [], itemsRead: false, ver: '' };
+  var ITEMS = TERMS.items || [];
+
+  // 【v1.8】特約事項の見せ方。'text' なら文字、それ以外はスキャンPDF。
+  //   決めているのは settings『特約事項の表示方法』の1セルです（C07_terms.gs）。
+  var TERMS_TEXT = (TERMS.mode === 'text');
+  // ready は「お客様にお見せできる状態か」。false ならご承認まで進めません。
+  //   （v1.7 までの pdfReady を置き換えたものです）
+  var TERMS_READY = (TERMS.ready !== undefined) ? !!TERMS.ready : !!TERMS.pdfReady;
+
+  // 読んだかどうか（サーバーに記録済みなら、開き直しても押し直さなくてよい）
+  var READ = {
+    terms: (TERMS.alreadyRead === true),
+    items: (ITEMS.length === 0) || (TERMS.itemsRead === true)
+  };
+
+  // ---- 特約条項のカード ----
+  if (!TERMS_READY) {
+    // ★設定漏れ（PDFのIDが空欄／本文シートが読めない）。
+    //   ここで素通りさせると、この改修で防ぎたかったことが静かに起き続けます。
+    //   お客様には原因を説明せず、担当へ回します。
+    $('btnTerms').disabled = true;
+    $('btnTerms').textContent = '📄 ただいま表示できません';
+    $('termsErr').textContent =
+      'ただいま特約条項を表示できません。\nお手数ですが、担当までご連絡ください。';
+    show('termsErr');
+  } else if (TERMS_TEXT) {
+    // 【v1.8】文字で見せるときは、開いた瞬間に読めます（読み込み待ちがありません）。
+    //   拡大・縮小のボタンも要りません。
+    buildArticles();
+  } else {
+    // スキャンPDFのときだけ、読む画面をPC向けに広げます（CSS の .pdfmode）
+    $('shTerms').classList.add('pdfmode');
+  }
+
+  /** 【v1.8】特約事項の本文を組み立てる */
+  function buildArticles() {
+    var arts = TERMS.articles || [];
+    var html = '';
+    arts.forEach(function (a) {
+      var t = esc(a.title), b = esc(a.body);
+      if (a.kind === '枠') {
+        html += '<div class="art-box"><div class="t">' + t + '</div><div class="b">' + b + '</div></div>';
+      } else if (a.kind === '区切り') {
+        html += '<div class="art-sec">' + t + '</div>';
+      } else if (a.kind === '誓約') {
+        html += '<div class="art-pledge">' + b + '</div>';
+      } else if (a.kind === '版') {
+        html += '<p class="art-ver">' + b + '</p>';
+      } else {
+        html += '<div class="art"><div class="h">' + t + '</div><div class="b">' + b + '</div></div>';
+      }
+    });
+    $('termsArea').innerHTML = html;
+  }
+
+  // ---- 重要事項のカード（選ばれているときだけ） ----
+  if (ITEMS.length > 0) {
+    var listHtml = '';
+    ITEMS.forEach(function (it) {
+      listHtml += '<div><span class="n">' + esc(it.no) + '</span>' + esc(it.title) + '</div>';
+    });
+    $('itemList').innerHTML = listHtml;
+
+    var itemsHtml = '';
+    ITEMS.forEach(function (it) {
+      itemsHtml += '<div class="item">' +
+        '<div class="h"><span class="n">' + esc(it.no) + '</span><span>' + esc(it.title) + '</span></div>' +
+        '<div class="b">' + esc(it.body) + '</div>' +
+        '</div>';
+    });
+    $('itemsArea').innerHTML = itemsHtml;
+
+    show('cardItems');
+  }
+
+  function esc(s) {
+    return String(s === undefined || s === null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /** 「読みました」の見た目を更新する */
+  function paintRead() {
+    var bt = $('btnTerms'), st = $('stTerms');
+    if (READ.terms) {
+      bt.classList.add('done');
+      bt.textContent = '✅ 特約条項（注文書の裏面）を確認しました';
+      st.className = 'readstate ok';
+      st.textContent = 'ご確認ありがとうございました（もう一度読むこともできます）';
+    }
+    if (ITEMS.length > 0) {
+      var bi = $('btnItems'), si = $('stItems');
+      if (READ.items) {
+        bi.classList.add('done');
+        bi.textContent = '✅ 重要事項のご説明を確認しました';
+        si.className = 'readstate ok';
+        si.textContent = 'ご確認ありがとうございました（もう一度読むこともできます）';
+      }
+    }
+  }
+  paintRead();
+
+  // ---- 読む画面の開け閉め ----
+  //  ★閉じるボタン（×）では「読んだこと」にしません。
+  //    いちばん下の「確認しました」を押したときだけです。
+  function openSheet(id) {
+    $(id).classList.add('on');
+    $(id).querySelector('.sheet-body').scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSheet(id) {
+    $(id).classList.remove('on');
+    document.body.style.overflow = '';
+  }
+
+  $('btnTerms').addEventListener('click', function () {
+    openSheet('shTerms');
+    if (!TERMS_TEXT) { loadTermsPdf(); }   // v1.8：文字のときは読み込むものがありません
+  });
+  $('shTermsX').addEventListener('click', function () { closeSheet('shTerms'); });
+  $('shItemsX').addEventListener('click', function () { closeSheet('shItems'); });
+  if (ITEMS.length > 0) {
+    $('btnItems').addEventListener('click', function () { openSheet('shItems'); });
+  }
+
+  /** 「確認しました」── サーバーへ記録してから閉じる */
+  function confirmRead(kind, sheetId, errId) {
+    var btnId = (kind === 'important') ? 'btnItemsOk' : 'btnTermsOk';
+    var b = $(btnId);
+    b.disabled = true;
+    b.textContent = '記録しています…';
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        b.disabled = false;
+        b.textContent = '確認しました';
+        if (!res || !res.ok) {
+          // 記録できなかった＝承認も通りません。原因を伏せずに、もう一度押していただく
+          $(errId).textContent = (res && res.message)
+            ? res.message
+            : '記録できませんでした。お手数ですが、もう一度お試しください。';
+          show(errId);
+          closeSheet(sheetId);
+          return;
+        }
+        hide(errId);
+        if (kind === 'important') { READ.items = true; } else { READ.terms = true; }
+        paintRead();
+        closeSheet(sheetId);
+        refresh();
+      })
+      .withFailureHandler(function (e) {
+        console.error(e);
+        b.disabled = false;
+        b.textContent = '確認しました';
+        $(errId).textContent = '通信に失敗しました。\n電波の良い場所で、もう一度お試しください。';
+        show(errId);
+        closeSheet(sheetId);
+      })
+      .markTermsRead(MODEL.token, kind);
+  }
+
+  $('btnTermsOk').addEventListener('click', function () {
+    confirmRead('terms', 'shTerms', 'termsErr');
+  });
+  if (ITEMS.length > 0) {
+    $('btnItemsOk').addEventListener('click', function () {
+      confirmRead('important', 'shItems', 'itemsErr');
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // チェックの見た目とボタンの有効化
+  // ------------------------------------------------------------------
+  function syncCheck(cbId, labelId) {
+    var cb = $(cbId), lb = $(labelId);
+    if (!cb || !lb) return;
+    if (cb.checked) { lb.classList.add('on'); } else { lb.classList.remove('on'); }
+  }
+
+  /**
+   * ご承認ボタンを押せるかどうかを決める。
+   *
+   * ★v1.5 で条件が2つ増えました。
+   *   ただ無効にするだけだと、お客様は「なぜ押せないのか」が分かりません。
+   *   残っていることを、押せない理由として画面に出します。
+   */
+  function refresh() {
+    syncCheck('ckWarranty', 'ckWarrantyLabel');
+    syncCheck('ckContract', 'ckContractLabel');
+
+    var need = [];
+    if (!TERMS_READY) {
+      need.push('・ただいま特約条項を表示できません。担当までご連絡ください');
+    } else if (!READ.terms) {
+      need.push('・注文書の特約事項（裏面）をお読みください');
+    }
+    if (ITEMS.length > 0 && !READ.items) {
+      need.push('・重要事項のご説明をお読みください');
+    }
+    if (!$('ckWarranty').checked) { need.push('・保証の内容のご確認にチェックを入れてください'); }
+    if ($('inKana').value.replace(/[\s　]/g, '') === '') { need.push('・フリガナをご入力ください'); }
+    if (!$('ckContract').checked) { need.push('・ご注文内容の同意にチェックを入れてください'); }
+
+    var el = $('gateHint');
+    if (need.length > 0) {
+      el.textContent = 'ご承認の前に、次のご確認をお願いいたします。\n' + need.join('\n');
+      el.classList.remove('hide');
+    } else {
+      el.classList.add('hide');
+    }
+
+    $('btnSubmit').disabled = (need.length > 0);
+  }
+  $('ckWarranty').addEventListener('change', refresh);
+  $('ckContract').addEventListener('change', refresh);
+  $('inKana').addEventListener('input', refresh);
+  refresh();
+
+  // ------------------------------------------------------------------
+  // PDFの読み込みと表示
+  //
+  //  ・サーバーから中身（Base64）だけを受け取る。Drive の URL は受け取らない
+  //  ・pdf.js で1ページずつ画像に描き直す（iPhone の Safari 対策）
+  //  ・失敗しても画面全体は止めない。金額・保証は上に文字で出ているため、
+  //    お客様は「何を承認するのか」を読めなくならない
+  //
+  //  ★v1.5：注文書と裏面の2か所で使うため、描き直しを1つの関数にまとめました。
+  //    ここを壊すと両方が同時に壊れます。
+  // ------------------------------------------------------------------
+
+  // pdf.js 一式の取得先。版数を上げるときは、下の4か所すべてを同じ版に揃えること。
+  var PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+
+  /**
+   * 【v1.6／v1.7】1枚のcanvasに割り当ててよい画素数の上限。
+   *
+   * ★iPhone・iPad は 1枚あたり約1,670万画素を超えると、
+   *   【エラーを出さずに真っ白なcanvasを返します】。
+   *   例外も console のエラーも出ないので、
+   *   症状は「表示できませんでした」ではなく「白い紙が出る」という形にしかなりません。
+   *   誰も原因に気づけないので、iOS では余裕を見て1,200万画素で止めます。
+   *
+   * ★【v1.7】PCにはこの制限がなく、しかも画面が広いぶん必要な画素数も増えるため、
+   *   PCだけ2,000万画素まで許します。iPadは画面が広くてもiOSなので、
+   *   ★必ず先にiOSかどうかを見ます（画面の広さで判定すると、iPadで白紙になります）。
+   *
+   * ★この値を上げるときは、必ず実機のiPhoneで裏面を300%にして確かめてください。
+   *   PCのChromeでは、上限を超えても平気で描けてしまいます。
+   */
+  function maxCanvasPx() {
+    var ua = navigator.userAgent || '';
+    var ios = /iPad|iPhone|iPod/.test(ua) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (ios) { return 12000000; }
+    // Android は端末の幅が広いものもあるため、短辺で見て小さければ控えめにする
+    if (Math.min(window.innerWidth || 0, window.innerHeight || 0) < 700) { return 12000000; }
+    return 20000000;
+  }
+
+  function pdfFailInto(stateId, msg) {
+    var el = $(stateId);
+    if (el) {
+      el.innerHTML = '';
+      el.textContent = msg || '書面を表示できませんでした。\nお手数ですが、担当までご連絡ください。';
+    }
+  }
+
+  /**
+   * @param {string} base64
+   * @param {string} areaId  描画先の入れ物のid
+   * @param {string} stateId 読み込み中・失敗の表示のid（areaId の中にあります）
+   * @param {string} prefix  拡大縮小ボタンのidが重複しないようにする接頭辞
+   */
+  function renderPdfInto(base64, areaId, stateId, prefix) {
+    if (typeof pdfjsLib === 'undefined') {
+      pdfFailInto(stateId, '表示に必要な読み込みができませんでした。\n通信環境の良い場所で、もう一度お試しください。');
+      return;
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'build/pdf.worker.min.js';
+
+    var raw = atob(base64);
+    var bytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) { bytes[i] = raw.charCodeAt(i); }
+
+    // 【v1.1】入力欄（フォーム）の中身も描かせる。
+    //   pdf.js は既定でフォームの「枠」だけを描き、入力された値を描きません。
+    //   罫線は出るのに金額や年式だけが空白に見える、という症状の正体がこれです。
+    var FORMS = (pdfjsLib.AnnotationMode && pdfjsLib.AnnotationMode.ENABLE_FORMS) || 2;
+
+    // 【v1.2】ここが「金額が空白になる」問題の急所です。
+    //   cMapUrl / cMapPacked
+    //     基幹の注文書は文字コードに 90msp-RKSJ-H（Shift_JIS系）を使っています。
+    //     その変換表がないと、pdf.js は文字の並びを読み取れず、何も描きません。
+    //   standardFontDataUrl
+    //     日本語フォントが埋め込まれていないため、代わりに使うフォントの置き場所。
+    //   ★この3つを外すと、金額と年式だけが静かに消えます。消さないこと。
+    //   ★v1.5：注文書と裏面で共用しています。外すと両方が壊れます。
+    pdfjsLib.getDocument({
+      data: bytes,
+      cMapUrl: PDFJS_BASE + 'cmaps/',
+      cMapPacked: true,
+      standardFontDataUrl: PDFJS_BASE + 'standard_fonts/'
+    }).promise.then(function (pdf) {
+      var area = $(areaId);
+      area.innerHTML = '';
+
+      // 拡大・縮小のボタン
+      var tools = document.createElement('div');
+      tools.className = 'pdf-tools';
+      tools.innerHTML =
+        '<button type="button" id="' + prefix + 'Out" aria-label="縮小">−</button>' +
+        '<span class="z" id="' + prefix + 'Now">100%</span>' +
+        '<button type="button" id="' + prefix + 'In" aria-label="拡大">＋</button>' +
+        '<span class="tip" id="' + prefix + 'Tip">文字が小さいときは＋で拡大できます</span>';
+      area.appendChild(tools);
+
+      var scroll = document.createElement('div');
+      scroll.className = 'pdf-scroll';
+      area.appendChild(scroll);
+
+      // 【v1.6】端末の細かさ。1.2倍しているのは、ブラウザの端数処理で
+      //   1画素ぶん足りなくなり、輪郭がにじむのを避けるための余裕です。
+      var dpr = Math.min(window.devicePixelRatio || 1, 3) * 1.2;
+
+      // ページの数だけcanvasを先に並べておく（中身は drawAll が描きます）
+      var sheets = [];
+      for (var p = 1; p <= pdf.numPages; p++) {
+        var cv = document.createElement('canvas');
+        cv.className = 'pdf-page';
+        scroll.appendChild(cv);
+        sheets.push({ no: p, el: cv });
+      }
+
+      var STEPS = [100, 150, 200, 300];
+      var idx = 0;
+      var busy = false;
+      var queued = null;
+      var firstDone = false;
+
+      function paintTools() {
+        var now = $(prefix + 'Now');
+        if (now) { now.textContent = busy ? '描いています…' : (STEPS[idx] + '%'); }
+        var bIn = $(prefix + 'In'), bOut = $(prefix + 'Out');
+        if (bIn) { bIn.disabled = busy || (idx >= STEPS.length - 1); }
+        if (bOut) { bOut.disabled = busy || (idx <= 0); }
+      }
+
+      /**
+       * 【v1.6】いまの倍率に必要な細かさで、全ページを描き直す。
+       *
+       * 【なぜ描き直すのか】
+       *   v1.5 までは1回だけ描いた画像を、＋ボタンでCSSの幅だけ引き伸ばしていました。
+       *   スマホで描いていたのは横 約1,420px。裏面のスキャンは 4,960px（600dpi）あり、
+       *   ★元データの3.5分の1しか使っていませんでした。
+       *   300%にしても画素は増えず、引き伸ばしてぼやけるだけです。
+       *   表面の注文書は大きな数字を読めれば足りたので気づけませんでしたが、
+       *   裏面は2段組みの細かい条文で、読ませたいのは違約金の条項です。
+       *   ぼやけると、この機能そのものが意味を失います。
+       *
+       * 【100%のときはむしろ軽くなります】
+       *   必要な画素数だけを使うため、等倍表示では以前より小さいcanvasになります。
+       *   電波の弱い場所・古い端末には、こちらのほうが優しい作りです。
+       */
+      function drawAll(zoom) {
+        if (busy) { queued = zoom; return; }
+        busy = true;
+        paintTools();
+
+        // 幅は描くたびに測り直す（画面の向きが変わっても追随するため）
+        var viewW = scroll.clientWidth || area.clientWidth || 320;
+        var cssW = viewW * zoom / 100;
+
+        var chain = Promise.resolve();
+        sheets.forEach(function (sheet) {
+          chain = chain.then(function () {
+            return pdf.getPage(sheet.no).then(function (page) {
+              var base = page.getViewport({ scale: 1 });
+
+              // ★1枚あたりの画素数の上限で頭を押さえる（iPhone対策。maxCanvasPx 参照）
+              var shape = base.height / base.width;
+              var capW = Math.floor(Math.sqrt(maxCanvasPx() / shape));
+              var pxW = Math.max(320, Math.min(Math.round(cssW * dpr), capW));
+
+              var vp = page.getViewport({ scale: pxW / base.width });
+              // ★width/height を入れるとcanvasは白紙に戻ります。描き直しの前に置くこと
+              sheet.el.width = Math.floor(vp.width);
+              sheet.el.height = Math.floor(vp.height);
+              sheet.el.style.width = zoom + '%';
+              sheet.el.style.maxWidth = 'none';
+
+              return page.render({
+                canvasContext: sheet.el.getContext('2d'),
+                viewport: vp,
+                annotationMode: FORMS
+              }).promise;
+            });
+          });
+        });
+
+        chain.then(function () {
+          firstDone = true;
+          busy = false;
+          paintTools();
+          if (queued !== null) { var z = queued; queued = null; drawAll(z); }
+        })['catch'](function (e) {
+          console.error(e);
+          busy = false;
+          if (!firstDone) {
+            // 1回も描けていない＝画面には何も出ていない。案内に差し替える
+            area.innerHTML = '<div class="pdf-state" id="' + stateId + '"></div>';
+            pdfFailInto(stateId, null);
+          } else {
+            // 拡大の描き直しだけが失敗した。前の表示は残っているので、倍率を戻す
+            queued = null;
+            idx = 0;
+            paintTools();
+          }
+        });
+      }
+
+      var bIn = $(prefix + 'In'), bOut = $(prefix + 'Out');
+      if (bIn) {
+        bIn.addEventListener('click', function () {
+          if (busy || idx >= STEPS.length - 1) { return; }
+          idx++;
+          drawAll(STEPS[idx]);
+        });
+      }
+      if (bOut) {
+        bOut.addEventListener('click', function () {
+          if (busy || idx <= 0) { return; }
+          idx--;
+          drawAll(STEPS[idx]);
+          if (idx === 0) { scroll.scrollLeft = 0; }
+        });
+      }
+
+      drawAll(STEPS[idx]);
+    })['catch'](function (e) {
+      console.error(e);
+      pdfFailInto(stateId, null);
+    });
+  }
+
+  // ---- 注文書PDF（画面を開いたときに読む） ----
+  if (MODEL.hasPdf) {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.ok && res.base64) { renderPdfInto(res.base64, 'pdfArea', 'pdfState', 'z'); }
+        else { pdfFailInto('pdfState', res && res.message ? res.message : '注文書を表示できませんでした。\nお手数ですが、担当までご連絡ください。'); }
+      })
+      .withFailureHandler(function (e) {
+        console.error(e);
+        pdfFailInto('pdfState', '注文書を読み込めませんでした。\n通信環境の良い場所で、もう一度お試しください。');
+      })
+      .getOrderPdf(MODEL.token);
+  } else {
+    pdfFailInto('pdfState', '注文書のファイルが見つかりませんでした。\nお手数ですが、担当までご連絡ください。');
+  }
+
+  // ---- 裏面PDF（ボタンを押したときに初めて読む） ----
+  //  ★最初から読むと、注文書と二重の通信になり、電波の弱い場所の画面が重くなります。
+  var termsLoading = false;
+  var termsLoaded = false;
+  function loadTermsPdf() {
+    if (TERMS_TEXT) { return; }                                     // v1.8：文字のときは呼ばれません
+    if (termsLoaded || termsLoading || !TERMS.pdfReady) { return; }
+    termsLoading = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        termsLoading = false;
+        if (res && res.ok && res.base64) {
+          termsLoaded = true;
+          renderPdfInto(res.base64, 'termsArea', 'termsState', 't');
+        } else {
+          pdfFailInto('termsState', res && res.message ? res.message : null);
+        }
+      })
+      .withFailureHandler(function (e) {
+        console.error(e);
+        termsLoading = false;
+        pdfFailInto('termsState', '読み込めませんでした。\n通信環境の良い場所で、もう一度お試しください。');
+      })
+      .getTermsPdf(MODEL.token);
+  }
+
+  // ------------------------------------------------------------------
+  // ご承認の送信
+  // ------------------------------------------------------------------
+  var SENDING = false;
+
+  $('btnSubmit').addEventListener('click', function () {
+    if (SENDING) { return; }
+    SENDING = true;
+    hide('formErr');
+    $('btnSubmit').disabled = true;
+    $('btnSubmit').textContent = '送信中…';
+    // 控えメールの作成と送信で数秒かかります。
+    // 何をしているかを書いておかないと、お客様は固まったと思って操作します。
+    $('ovText').textContent = 'ご承認を受け付けています…\nご注文内容の控えをお送りしています。';
+    $('overlay').classList.add('on');
+
+    google.script.run
+      .withSuccessHandler(onDone)
+      .withFailureHandler(function (e) {
+        console.error(e);
+        onError('通信に失敗しました。\n電波の良い場所で、もう一度お試しください。', false);
+      })
+      .submitSign(MODEL.token, {
+        kana: $('inKana').value,
+        agreedWarranty: $('ckWarranty').checked,
+        agreedContract: $('ckContract').checked,
+        device: (navigator.userAgent || '') + ' / ' + window.screen.width + 'x' + window.screen.height
+      });
+  });
+
+  function onError(message, reload) {
+    $('overlay').classList.remove('on');
+    SENDING = false;
+    $('btnSubmit').textContent = 'この内容で承認する';
+    var el = $('formErr');
+    el.textContent = message;
+    el.classList.remove('hide');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (!reload) { refresh(); }
+  }
+
+  function onDone(res) {
+    if (!res || !res.ok) {
+      onError((res && res.message) ? res.message : '処理できませんでした。担当までご連絡ください。',
+              !!(res && res.reload));
+      return;
+    }
+    $('overlay').classList.remove('on');
+    hide('screenForm');
+
+    setText('dMark', '✅');
+    setText('dTitle', 'ご承認をいただきました');
+
+    var msg = 'ありがとうございました。\n' +
+      (res.signedAt ? ('ご承認日時：' + res.signedAt + '\n') : '') + '\n';
+    // 控えを送れていないのに「お送りしました」と書かないこと。
+    msg += res.copyMailSent
+      ? 'ご登録のメールアドレスへ、ご注文内容の控えをお送りしました。\n' +
+        '注文書と確認書を添付しております。大切に保管してください。\n\n' +
+        'しばらく経っても届かない場合は、迷惑メールフォルダをご確認のうえ、\n' +
+        '担当までご連絡ください。'
+      : 'ご注文内容の控えは、担当よりあらためてお送りいたします。';
+    setText('dMsg', msg);
+
+        // v1.4：ご回答済みのお客様には「マイページのご案内」に差し替える。
+    //   ★文言は C04_copymail.gs の buildCopyMailBody_ と必ず揃えること。
+    //     別ファイルのため共有できません。片方だけ直すと、画面とメールで
+    //     書いてあることが食い違います（エラーは出ません）。
+    //   ★保険システムからご指定いただいた文言です（返信書4 §5-3）。
+    //     変えるときは先方へ一報を。
+    if (res.surveyUrl) {
+      if (res.surveyAnswered) {
+        setText('dSurveyTtl', 'マイページのご案内');
+        setText('dSurveyDesc', 'ご担当者へのご連絡や、ご納車後のお車の情報をご確認いただけます。');
+        setText('dSurveyBtn', 'マイページを開く');
+      } else {
+        setText('dSurveyTtl', 'ご成約者様アンケートにご回答ください');
+        setText('dSurveyDesc', 'ご回答は1〜2分で終わります。同じページから、ご担当者へのご連絡や、ご納車後のお車の情報もご確認いただけます。');
+        setText('dSurveyBtn', 'ご成約者様アンケートにご回答ください');
+      }
+      $('dSurveyBtn').setAttribute('href', res.surveyUrl);
+      show('dSurvey');
+    }
+    show('dContact');
+    show('screenDone');
+    window.scrollTo(0, 0);
+  }
+
+}
+
+/* ====================================================================
+   起動
+   ★bootstrap（読み取り）ではトークンを消費しません。
+     お客様が何度リロードされても、署名できなくなることはありません。
+   ==================================================================== */
+(function start() {
+  if (!TOKEN) {
+    bootError('リンクが正しくありません。\nお手数ですが、担当までご連絡ください。');
+    return;
+  }
+  apiGet({ api: 'bootstrap', t: TOKEN })
+    .then(function (res) {
+      if (!res || !res.ok || !res.model) {
+        bootError((res && res.message) ? res.message :
+          'システムの都合により、ただいま画面を表示できません。\n' +
+          'お手数ですが、しばらく時間をおいてからもう一度お試しください。');
+        return;
+      }
+      MODEL = res.model;
+      hideLoading();
+      bootPage();
+    })['catch'](function (e) {
+      console.error(e);
+      bootError('通信に失敗しました。\n電波の良い場所で、もう一度お試しください。');
+    });
+})();
+
+function hideLoading() {
+  var el = document.getElementById('screenLoading');
+  if (el) { el.classList.add('hide'); }
+}
+
+/** MODEL を受け取る前に失敗したときの画面（受け取った後のエラーは bootPage 側が出します） */
+function bootError(message) {
+  var g = function (id) { return document.getElementById(id); };
+  hideLoading();
+  if (g('hCompany')) { g('hCompany').textContent = 'GTNET株式会社'; }
+  if (g('dMark'))    { g('dMark').textContent = '🔒'; }
+  if (g('dTitle'))   { g('dTitle').textContent = '画面を表示できませんでした'; }
+  if (g('dMsg'))     { g('dMsg').textContent = message; }
+  if (g('dContact')) { g('dContact').classList.remove('hide'); }
+  if (g('screenDone')){ g('screenDone').classList.remove('hide'); }
+  window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>
