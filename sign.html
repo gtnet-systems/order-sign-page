@@ -10,6 +10,15 @@
   GTNET 見積・注文 承認システム
   ── お客様向け「注文書のご確認・ご承認」画面（ステップ2）
 
+    C10_page.html  v1.10 (2026-09-10)
+      ・【注文書のにじみを取った】canvasの画素数を、画面の画素数に1対1で合わせた。
+        v1.6 以来ずっと 1.2倍で描いていたが、これは害でしかなかった。
+        1,521画素で描いた絵を 1,253画素の画面に縮めて表示していたため、
+        文字の輪郭が画面の画素の途中に落ち、灰色ににじんでいた。
+        ★canvasは「画面の画素数×devicePixelRatio」ちょうどで描くのが原則。
+          多く描いても、画面がその画素を持っていないので細かくは見えない。
+          むしろ半端な縮小が入るぶん、確実に汚くなる。
+
     C10_page.html  v1.9 (2026-09-10)
       ・【PCのとき、注文書を大きく見せる】ようにした。
         これまでは画面全体が680px（スマホに合わせた幅）で、注文書もその中に
@@ -1207,9 +1216,18 @@ function bootPage() {
       scroll.className = 'pdf-scroll';
       area.appendChild(scroll);
 
-      // 【v1.6】端末の細かさ。1.2倍しているのは、ブラウザの端数処理で
-      //   1画素ぶん足りなくなり、輪郭がにじむのを避けるための余裕です。
-      var dpr = Math.min(window.devicePixelRatio || 1, 3) * 1.2;
+      // 【v1.10】端末の細かさ。★1対1で合わせること。
+      //
+      //   v1.6〜v1.9 はここを 1.2倍していました。「端数で1画素足りなくなるのを
+      //   避ける余裕」のつもりでしたが、逆でした。
+      //   1,521画素で描いた絵を 1,253画素の画面に表示すると、ブラウザが 0.82倍に
+      //   縮めます。文字の輪郭が画面の画素の途中に落ち、灰色ににじみます。
+      //
+      //   ★画面が持っていない細かさは、どれだけ多く描いても見えません。
+      //     多く描くぶん、半端な縮小が入って必ず汚くなります。
+      //   ★端数の不足は、下の Math.ceil で1画素だけ切り上げて防ぎます。
+      //     倍率を掛けて防ぐものではありません。
+      var dpr = Math.min(window.devicePixelRatio || 1, 3);
 
       // ページの数だけcanvasを先に並べておく（中身は drawAll が描きます）
       var sheets = [];
@@ -1268,7 +1286,8 @@ function bootPage() {
               // ★1枚あたりの画素数の上限で頭を押さえる（iPhone対策。maxCanvasPx 参照）
               var shape = base.height / base.width;
               var capW = Math.floor(Math.sqrt(maxCanvasPx() / shape));
-              var pxW = Math.max(320, Math.min(Math.round(cssW * dpr), capW));
+              // 【v1.10】切り上げ。四捨五入だと1画素足りず、右端がにじむことがあります
+              var pxW = Math.max(320, Math.min(Math.ceil(cssW * dpr), capW));
 
               var vp = page.getViewport({ scale: pxW / base.width });
               // ★width/height を入れるとcanvasは白紙に戻ります。描き直しの前に置くこと
