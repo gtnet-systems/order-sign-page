@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>ご注文内容の控え</title>
+<!--
+  GTNET 見積・注文 承認システム
+  ── お客様向け「ご注文内容の控え」ページ（閲覧用リンク）
+
+    copy.html  v1.0 (2026-11-07)
+      控えメール（PDF添付）が Outlook 系に受け取り拒否されたお客様へ、
+      添付なしのメールでこのページのリンクをお送りする（本体 C11_copycheck.gs）。
+      ?c=（控えの鍵）で開く。鍵は有効期限なし。署名用の ?t= とは別物。
+
+    ★お客様の情報は、このファイルに1文字も書かない（公開リポジトリ）。
+      表示する中身は、すべて開いたときに GAS（copyInfo・copyPdf）から受け取る。
+    ★GAS_API は sign.html と同じ /exec URL にすること。
+-->
+<style>
+  :root { --ink:#1f2933; --sub:#52606d; --line:#e4e7eb; --bg:#f5f7fa; --card:#fff; --accent:#c8102e; --btn:#1f4e8c; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family: "Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",Meiryo,sans-serif; line-height:1.7; }
+  .wrap { max-width:680px; margin:0 auto; padding:16px 16px 40px; }
+  header { border-top:4px solid var(--accent); background:var(--card); padding:16px; border-radius:0 0 8px 8px; }
+  header .co { font-size:13px; color:var(--sub); }
+  h1 { font-size:20px; margin:4px 0 0; }
+  .card { background:var(--card); border-radius:8px; padding:16px; margin-top:16px; border:1px solid var(--line); }
+  .name { font-size:17px; margin:0 0 8px; }
+  dl { margin:0; display:grid; grid-template-columns: 8.5em 1fr; row-gap:6px; }
+  dt { color:var(--sub); font-size:14px; }
+  dd { margin:0; font-size:15px; word-break:break-all; }
+  .doc { border-top:1px solid var(--line); padding:14px 0; }
+  .doc:first-of-type { border-top:none; padding-top:4px; }
+  .doc .t { font-weight:bold; }
+  .doc .d { font-size:13px; color:var(--sub); margin-bottom:8px; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn { display:inline-block; text-decoration:none; text-align:center; padding:10px 16px; border-radius:6px;
+    font-size:15px; min-width:9em; border:1px solid var(--btn); }
+  .btn.p { background:var(--btn); color:#fff; }
+  .btn.s { background:#fff; color:var(--btn); }
+  .btn.off { opacity:.45; pointer-events:none; }
+  .state { font-size:13px; color:var(--sub); margin-top:6px; }
+  .msg { white-space:pre-line; }
+  .note { font-size:13px; color:var(--sub); margin-top:16px; }
+  .err h2 { font-size:17px; margin:0 0 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="co" id="co">&nbsp;</div>
+    <h1>ご注文内容の控え</h1>
+  </header>
+  <div id="main"><div class="card">読み込んでいます…</div></div>
+</div>
+
+<script>
+/* ★sign.html と同じ、お客様向けWebAppの /exec URL */
+var GAS_API = 'https://script.google.com/macros/s/AKfycbw5C6BZI5BOznnZvZ49DphNg1fLCQm40zv6KO7nbyesjkSrqYi5FBTmCZl-tyRDuSlWLQ/exec';
+
+var KEY = (function () { var q = new URLSearchParams(location.search); return q.get('c') || ''; })();
+
+/* 通信の作法は sign.html と同じ（Cookie を送らない GET。/u/N 問題を起こさない） */
+function apiGet(params) {
+  var qs = Object.keys(params).map(function (k) {
+    return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+  }).join('&');
+  return fetch(GAS_API + '?' + qs, { method: 'GET' }).then(function (r) { return r.json(); });
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+function showError(title, message) {
+  document.getElementById('main').innerHTML =
+    '<div class="card err"><h2>' + esc(title || 'このページは開けませんでした') + '</h2>' +
+    '<div class="msg">' + esc(message || 'お手数ですが、担当までご連絡ください。') + '</div></div>';
+}
+
+var DESC = {
+  order: '画面でご確認・ご承認いただいた注文書そのものです。',
+  confirm: 'いつ・どの注文書にご承認いただいたかの記録です。'
+};
+
+function render(info) {
+  document.getElementById('co').textContent = info.company || '';
+  var h = '';
+  h += '<div class="card"><p class="name">' + esc(info.customer) + ' 様</p><dl>';
+  if (info.signedAt) h += '<dt>ご承認日時</dt><dd>' + esc(info.signedAt) + '</dd>';
+  h += '<dt>管理番号</dt><dd>' + esc(info.kanri) + '</dd>';
+  if (info.total) h += '<dt>お支払い総額</dt><dd>' + esc(info.total) + ' 円（税込）</dd>';
+  h += '<dt>担当</dt><dd>' + esc(info.staff) + '</dd>';
+  h += '</dl></div>';
+
+  h += '<div class="card">';
+  if (!info.docs || info.docs.length === 0) {
+    h += '<div class="msg">書類を表示できませんでした。お手数ですが、担当までご連絡ください。</div>';
+  }
+  (info.docs || []).forEach(function (d) {
+    h += '<div class="doc"><div class="t">' + esc(d.name) + '（PDF）</div>' +
+      '<div class="d">' + esc(DESC[d.kind] || '') + '</div>' +
+      '<div class="btns">' +
+      '<a class="btn p off" id="open_' + d.kind + '" target="_blank" rel="noopener">開いて見る</a>' +
+      '<a class="btn s off" id="save_' + d.kind + '">保存する</a>' +
+      '</div><div class="state" id="st_' + d.kind + '">読み込んでいます…</div></div>';
+  });
+  h += '</div>';
+
+  h += '<div class="note">このページは、いつでもご覧いただけます。<br>' +
+    'ご不明な点は、担当までお気軽にお問い合わせください。<br>' +
+    esc(info.staff) + (info.phone ? '<br>' + esc(info.phone) : '') + '</div>';
+  document.getElementById('main').innerHTML = h;
+
+  (info.docs || []).forEach(function (d) { loadPdf(d.kind); });
+}
+
+function loadPdf(kind) {
+  var st = document.getElementById('st_' + kind);
+  apiGet({ api: 'copyPdf', c: KEY, kind: kind }).then(function (res) {
+    if (!res || !res.ok || !res.base64) { st.textContent = (res && res.message) || '読み込めませんでした。'; return; }
+    var raw = atob(res.base64);
+    var bytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    var o = document.getElementById('open_' + kind), s = document.getElementById('save_' + kind);
+    o.href = url; s.href = url; s.setAttribute('download', res.name || (kind + '.pdf'));
+    o.className = 'btn p'; s.className = 'btn s';
+    st.textContent = '';
+  }).catch(function () { st.textContent = '読み込めませんでした。通信状況をご確認のうえ、ページを開き直してください。'; });
+}
+
+if (!KEY) {
+  showError('URLが正しくないようです', 'お手数ですが、メールに記載されたURLを、途中で切れないように\nもう一度開いてみてください。');
+} else {
+  apiGet({ api: 'copyInfo', c: KEY }).then(function (res) {
+    if (!res || !res.ok) { showError(res && res.title, res && res.message); return; }
+    render(res.info);
+  }).catch(function () {
+    showError('画面を表示できませんでした', '通信状況をご確認のうえ、しばらくしてからもう一度お試しください。');
+  });
+}
+</script>
+</body>
+</html>
