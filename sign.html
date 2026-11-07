@@ -507,6 +507,7 @@ label.check span{font-size:15px;line-height:1.6;}
   font-size:13px;text-align:center;
 }
 .item .b{font-size:14.5px;line-height:1.9;white-space:pre-wrap;word-break:break-word;}
+.item .b a{color:#1f5fa8;font-weight:700;text-decoration:underline;}
 
 /* 期限・注意 */
 .limit{
@@ -976,12 +977,23 @@ function bootPage() {
     ITEMS.forEach(function (it) {
       itemsHtml += '<div class="item">' +
         '<div class="h"><span class="n">' + esc(it.no) + '</span><span>' + esc(it.title) + '</span></div>' +
-        '<div class="b">' + esc(it.body) + '</div>' +
+        '<div class="b">' + itemBodyHtml(it.body) + '</div>' +
         '</div>';
     });
     $('itemsArea').innerHTML = itemsHtml;
 
     show('cardItems');
+  }
+
+  /**
+   * 2026-11-07：重要事項の本文に [文字](https://…) と書くと、リンクとして出す
+   * （例：5番の本文の末尾「▶ 年払い（国産車）」→ Drive のリーフレットPDFを別タブで開く）。
+   * https:// で始まるものだけ。それ以外はそのまま文字で出す。
+   */
+  function itemBodyHtml(s) {
+    return esc(s).replace(/\[([^\]\n]+)\]\((https:\/\/[^\s"'<>)]+)\)/g, function (m, t, u) {
+      return '<a href="' + u + '" target="_blank" rel="noopener">' + t + '</a>';
+    });
   }
 
   function esc(s) {
