@@ -9,6 +9,7 @@
   GTNET 見積・注文 承認システム
   ── お客様向け「ご注文内容の控え」ページ（閲覧用リンク）
 
+    copy.html  v1.1 (2026-11-07)  GAS への呼び出しの鍵を c → key（c は GAS の予約語）
     copy.html  v1.0 (2026-11-07)
       控えメール（PDF添付）が Outlook 系に受け取り拒否されたお客様へ、
       添付なしのメールでこのページのリンクをお送りする（本体 C11_copycheck.gs）。
@@ -17,6 +18,8 @@
     ★お客様の情報は、このファイルに1文字も書かない（公開リポジトリ）。
       表示する中身は、すべて開いたときに GAS（copyInfo・copyPdf）から受け取る。
     ★GAS_API は sign.html と同じ /exec URL にすること。
+    ★GAS へ渡す鍵の名前は key。c は GAS の予約語で、付けると Failed to fetch になる（v1.0 で発生）。
+      このページ自身の URL は ?c= のままでよい（GAS ではないため）。
 -->
 <style>
   :root { --ink:#1f2933; --sub:#52606d; --line:#e4e7eb; --bg:#f5f7fa; --card:#fff; --accent:#c8102e; --btn:#1f4e8c; }
@@ -122,7 +125,7 @@ function render(info) {
 
 function loadPdf(kind) {
   var st = document.getElementById('st_' + kind);
-  apiGet({ api: 'copyPdf', c: KEY, kind: kind }).then(function (res) {
+  apiGet({ api: 'copyPdf', key: KEY, kind: kind }).then(function (res) {
     if (!res || !res.ok || !res.base64) { st.textContent = (res && res.message) || '読み込めませんでした。'; return; }
     var raw = atob(res.base64);
     var bytes = new Uint8Array(raw.length);
@@ -138,7 +141,7 @@ function loadPdf(kind) {
 if (!KEY) {
   showError('URLが正しくないようです', 'お手数ですが、メールに記載されたURLを、途中で切れないように\nもう一度開いてみてください。');
 } else {
-  apiGet({ api: 'copyInfo', c: KEY }).then(function (res) {
+  apiGet({ api: 'copyInfo', key: KEY }).then(function (res) {
     if (!res || !res.ok) { showError(res && res.title, res && res.message); return; }
     render(res.info);
   }).catch(function () {
